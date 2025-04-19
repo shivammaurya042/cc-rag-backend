@@ -4,7 +4,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -13,15 +14,23 @@
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
     "@google/generative-ai": "^0.24.0",
+    "@langchain/community": "^0.3.41",
+    "@langchain/core": "^0.3.45",
+    "@langchain/google-genai": "^0.2.4",
+    "@langchain/openai": "^0.5.6",
     "@pinecone-database/pinecone": "^5.0.0",
     "@qdrant/js-client-rest": "^1.13.0",
     "axios": "^1.8.4",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "form-data": "^4.0.2",
     "fs": "^0.0.1-security",
+    "langchain": "^0.3.23",
     "llamaindex": "^0.9.0",
     "marked": "^15.0.8",
     "openai": "^4.95.0",
+    "redis": "^4.7.0",
     "uuid": "^11.1.0"
   }
 }
