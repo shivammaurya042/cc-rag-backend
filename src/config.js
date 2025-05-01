@@ -17,9 +17,9 @@ export const config = {
     sessionTtlSeconds: parseInt(process.env.SESSION_TTL_SECONDS || '3600', 10),
 
     // Model/Service Config
-    embeddingModelName: 'text-embedding-3-small',
+    EMBEDDING_OPENAI_TEXT_3_SMALL: 'text-embedding-3-small',
     agentModelName: 'gemini-2.0-flash', // dont change
-    qdrantCollectionName: 'cc_t_and_c', // Ensure this matches ingestion
+    qdrantCollectionName: 'cards_store', // Ensure this matches ingestion
     maxConversationTokens: 4000, // Approx token limit for history passed to LLM
 };
 

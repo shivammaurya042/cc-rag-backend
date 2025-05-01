@@ -7,7 +7,8 @@ import { config } from "../config.js";
 // Initialize clients needed by the tool (outside the function for efficiency)
 const embeddings = new OpenAIEmbeddings({
     apiKey: config.openaiApiKey,
-    modelName: config.embeddingModelName,
+    model: config.EMBEDDING_OPENAI_TEXT_3_SMALL,
+    dimensions: 1536,
 });
 
 const qdrantClient = new QdrantClient({
@@ -26,6 +27,7 @@ export async function createSearchTool() {
             let cardName, searchQuery;
 
             // Langchain sometimes passes a stringified JSON, sometimes an object. Handle both.
+            console.warn("111");
             try {
                  if (typeof input === 'string') {
                     const parsedInput = JSON.parse(input);
@@ -39,22 +41,27 @@ export async function createSearchTool() {
                  if (!cardName || !searchQuery) {
                     return "Error: Tool input must be a JSON object containing both 'card_name' and 'search_query' keys.";
                  }
-                 cardName = cardName.trim();
-                 searchQuery = searchQuery.trim();
+                 cardName = cardName.toLowerCase().trim();
+                 searchQuery = searchQuery.toLowerCase().trim();
 
             } catch (e) {
                 return "Error: Invalid input format. Input must be a JSON object string or object with 'card_name' and 'search_query'.";
             }
 
 
+            console.warn("222");
+            // Create lowercase version of valid cards for case-insensitive comparison
+            const validCardsLower = validCards.map(card => card.toLowerCase());
+            
             // 1. Validate Card Name
-            if (!validCards.includes(cardName)) {
+            if (!validCardsLower.includes(cardName)) {
                 console.log(`[Tool] Invalid card name received: ${cardName}`);
                 return `Error: Card name '${cardName}' is not valid or not supported. Please choose from: ${validCards.join(', ')}.`;
             }
             console.log(`[Tool] Searching for query "${searchQuery}" in T&Cs for card "${cardName}"`);
 
             try {
+                console.log("[Tool] card name is:: ", cardName, "search query is:: ", searchQuery);
                 // 2. Embed Search Query
                 const queryEmbedding = await embeddings.embedQuery(searchQuery);
 
@@ -68,9 +75,9 @@ export async function createSearchTool() {
                 const searchResult = await qdrantClient.search(config.qdrantCollectionName, {
                     vector: queryEmbedding,
                     filter: searchFilter,
-                    limit: 5, // Keep k=5 as planned
-                    with_payload: true,
+                    limit: 10, // Keep k=5 as planned
                 });
+                console.log("[Tool] Qdrant search result is:: ", searchResult);
 
                 console.log(`[Tool] Qdrant returned ${searchResult.length} results.`);
 

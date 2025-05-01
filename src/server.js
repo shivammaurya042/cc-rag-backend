@@ -1,11 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
-import { getRedisClient } from './redisClient.js';
-
 import { getAgentExecutor } from './agent/agent.js';
 import { getChatHistory, saveChatHistory } from './agent/memory.js';
 import { AIMessage, BaseMessage, HumanMessage } from '@langchain/core/messages'; // Import specific message types
+import { getRedisClient } from './redisClient.js'; // Import redis client getter
 
 
 const app = express();
@@ -43,6 +42,7 @@ app.post('/chat', async (req, res) => {
         const agentExecutorInstance = await getAgentExecutor();
 
         // Prepare agent input (ensure correct types)
+        // The specific keys needed ("input", "chat_history") match the prompt placeholders
         const agentInput = {
             input: message,
             chat_history: chatHistory,
@@ -53,7 +53,8 @@ app.post('/chat', async (req, res) => {
         const agentResponse = await agentExecutorInstance.invoke(agentInput);
         console.log("Agent response object:", agentResponse); // Log the full response for debugging
 
-        // Extract the final output string
+        // Extract the final output string - varies slightly depending on agent type,
+        // but 'output' is standard for AgentExecutor result.
         const agentOutput = agentResponse?.output || "Sorry, I encountered an issue and couldn't generate a response.";
 
         console.log(`Agent output: ${agentOutput}`);
@@ -89,6 +90,8 @@ async function startServer() {
 
         app.listen(config.port, () => {
             console.log(`Server listening on port ${config.port}`);
+            console.log(`Qdrant URL: ${config.qdrantUrl}`);
+            console.log(`Redis URL: ${config.redis.host}:${config.redis.port}`);
         });
     } catch (error) {
          console.error("Failed to start server:", error);
