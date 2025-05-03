@@ -20,14 +20,13 @@ export async function createSearchTool() {
     const validCards = await loadValidCards(); // Load valid cards once
 
     const searchCreditCardTermsTool = new DynamicTool({
-        name: "search_credit_card_terms",
-        description: `Searches the Terms & Conditions for a *single, specific* credit card (from the valid list: ${JSON.stringify(validCards)}) to find information relevant to the search query. Use this tool only after confirming the exact, valid card_name. Input must be a JSON object with keys "card_name" and "search_query". Returns relevant text snippets or an error message.`,
+        name: "search_credit_card_info",
+        description: `Searches the documents for a *single, specific* credit card (from the valid list: ${JSON.stringify(validCards)}) to find information relevant to the search query. Use this tool only after confirming the exact, valid card_name. Input must be a JSON object with keys "card_name" and "search_query". Returns relevant text snippets or an error message.`,
         func: async (input) => {
             console.log("[Tool] Received input:", input);
             let cardName, searchQuery;
 
             // Langchain sometimes passes a stringified JSON, sometimes an object. Handle both.
-            console.warn("111");
             try {
                  if (typeof input === 'string') {
                     const parsedInput = JSON.parse(input);
@@ -48,8 +47,6 @@ export async function createSearchTool() {
                 return "Error: Invalid input format. Input must be a JSON object string or object with 'card_name' and 'search_query'.";
             }
 
-
-            console.warn("222");
             // Create lowercase version of valid cards for case-insensitive comparison
             const validCardsLower = validCards.map(card => card.toLowerCase());
             
@@ -58,7 +55,7 @@ export async function createSearchTool() {
                 console.log(`[Tool] Invalid card name received: ${cardName}`);
                 return `Error: Card name '${cardName}' is not valid or not supported. Please choose from: ${validCards.join(', ')}.`;
             }
-            console.log(`[Tool] Searching for query "${searchQuery}" in T&Cs for card "${cardName}"`);
+            console.log(`[Tool] Searching for query "${searchQuery}" in documents for card "${cardName}"`);
 
             try {
                 console.log("[Tool] card name is:: ", cardName, "search query is:: ", searchQuery);
@@ -75,7 +72,7 @@ export async function createSearchTool() {
                 const searchResult = await qdrantClient.search(config.qdrantCollectionName, {
                     vector: queryEmbedding,
                     filter: searchFilter,
-                    limit: 10, // Keep k=5 as planned
+                    limit: 15, // Keep k=5 as planned
                 });
                 console.log("[Tool] Qdrant search result is:: ", searchResult);
 
@@ -83,7 +80,7 @@ export async function createSearchTool() {
 
                 // 5. Format Results
                 if (searchResult.length === 0) {
-                    return `No specific information found for '${searchQuery}' in the T&Cs for '${cardName}'.`;
+                    return `No specific information found for '${searchQuery}' in the documents for '${cardName}'.`;
                 }
 
                 const contextSnippets = searchResult.map((point, index) => {
@@ -98,7 +95,7 @@ export async function createSearchTool() {
 
             } catch (error) {
                 console.error(`[Tool] Error during search for ${cardName}:`, error);
-                let errorMessage = "An internal error occurred while searching the terms and conditions.";
+                let errorMessage = "An internal error occurred while searching the documents.";
                 if (error.message?.includes('embedding')) {
                     errorMessage = "Error generating search query embedding.";
                 } else if (error.message?.includes('Qdrant')) { // Basic check

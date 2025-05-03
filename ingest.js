@@ -61,6 +61,7 @@ async function startLlamaParseJob(filePath) {
     });
 
     try {
+        form.append('parse_mode', 'parse_page_with_llm');
         const response = await axios.post(`${LLAMA_PARSE_BASE_URL}/upload`, form, {
             headers: {
                 ...form.getHeaders(),
@@ -159,33 +160,34 @@ async function getMarkdownResult(jobId) {
  * @returns {Array<{text: string, type: string, sectionHeader?: string}>} - Array of chunks.
  */
 function chunkMarkdown(markdownContent) {
-    console.log('[Chunking] Starting Markdown chunking...');
+    console.log('[Chunking] Starting Markdown chunking with context prepending...');
     const tokens = marked.lexer(markdownContent);
     const chunks = [];
     let currentSectionHeader = 'Unknown Section'; // Track current heading
 
     tokens.forEach(token => {
-        let chunkText = '';
+        let rawChunkText = ''; // The original text without the header
         let chunkType = 'unknown';
 
         switch (token.type) {
             case 'heading':
-                currentSectionHeader = token.text || 'Unnamed Section';
-                // Do not create a chunk for the heading itself
+                currentSectionHeader = token.text?.trim() || 'Unnamed Section';
+                // Don't create a chunk for the heading itself
                 break;
             case 'paragraph':
-                chunkText = token.text;
+                rawChunkText = token.text?.trim();
                 chunkType = 'paragraph';
                 break;
             case 'list':
-                 // Process list items individually
-                token.items?.forEach(item => {
-                    // Recursively get text from nested tokens within the list item
+                 token.items?.forEach(item => {
                     const extractText = (tokens) => tokens?.map(t => t.text || (t.tokens ? extractText(t.tokens) : '')).join(' ') || '';
                     const itemText = extractText(item.tokens).trim();
                      if (itemText) {
+                        // Prepend header to this list item
+                        const chunkTextWithHeader = `Section: ${currentSectionHeader}\n${itemText}`;
                         chunks.push({
-                            text: itemText,
+                            text: chunkTextWithHeader, // Text to be embedded
+                            rawText: itemText,         // Original text (optional, might store in payload)
                             type: 'list_item',
                             sectionHeader: currentSectionHeader
                         });
@@ -193,40 +195,36 @@ function chunkMarkdown(markdownContent) {
                 });
                 break; // Skip adding the parent 'list' token
             case 'table':
-                 // Convert table token to a simple text representation
-                 let tableText = `Table Header: ${token.header?.map(h => h.text).join(' | ')}\n`;
-                 token.rows?.forEach(row => {
-                    tableText += `Row: ${row?.map(cell => cell.text).join(' | ')}\n`;
-                 });
-                 chunkText = tableText.trim();
+                 let tableHeaderText = token.header?.map(h => h.text).join(' | ');
+                 let tableBodyText = token.rows?.map(row => `Row: ${row?.map(cell => cell.text).join(' | ')}`).join('\n');
+                 rawChunkText = `Table Header: ${tableHeaderText}\n${tableBodyText}`.trim();
                  chunkType = 'table';
                 break;
-            case 'space':
-            case 'hr': // Horizontal Rule
-                 // Ignore these types
-                 break;
-            case 'text': // Catch plain text tokens that might not be wrapped in paragraphs
-                 if (token.text && token.text.trim()) {
-                    chunkText = token.text.trim();
-                    chunkType = 'text_block'; // Assign a generic type
+            // ... (handle other cases like 'space', 'hr', 'text' as before, maybe prepend header too if they have text) ...
+             case 'text':
+             case 'code': // Example: also prepend context to code blocks if desired
+             case 'html': // Example: also prepend context to raw html blocks
+                 if (token.raw && token.raw.trim()) {
+                    rawChunkText = token.raw.trim();
+                    chunkType = token.type;
                  }
                  break;
-            // Add cases for other token types if needed (e.g., 'code', 'blockquote')
-            default:
-                 // Capture other potential text content if relevant and not handled above
-                 if (token.raw && token.raw.trim() && !chunkText) { // Use raw as fallback
-                    chunkText = token.raw.trim();
-                    chunkType = token.type || 'unknown_block';
-                 }
-                 break;
+
         }
 
         // Add the chunk if text was extracted (excluding lists handled above)
-        if (chunkText && chunkType !== 'unknown' && token.type !== 'list') {
-            chunks.push({ text: chunkText, type: chunkType, sectionHeader: currentSectionHeader });
+        // Prepend the header here for types processed above
+        if (rawChunkText && chunkType !== 'unknown' && token.type !== 'list') {
+             const chunkTextWithHeader = `Section: ${currentSectionHeader}\n${rawChunkText}`;
+             chunks.push({
+                 text: chunkTextWithHeader, // Text to be embedded
+                 rawText: rawChunkText,       // Original text (optional)
+                 type: chunkType,
+                 sectionHeader: currentSectionHeader
+             });
         }
     });
-    console.log(`[Chunking] Created ${chunks.length} chunks.`);
+    console.log(`[Chunking] Created ${chunks.length} chunks with prepended context.`);
     return chunks;
 }
 
@@ -245,7 +243,7 @@ async function extractMetadataWithLLM(initialText) {
 
     const prompt = `
 You are an expert assistant analyzing credit card Terms & Conditions documents.
-Analyze the following text, which represents the beginning of a T&C document:
+Analyze the following text, which represents the beginning of a document:
 ---
 ${initialText.substring(0, 4000)}
 ---
@@ -417,6 +415,7 @@ async function processDocument(pdfFilePath) {
                 // Contextual metadata
                 document_id: documentId,
                 page_number: chunk.page_number || null, // LlamaParse Markdown might not have page numbers easily
+                text: chunk.text || chunk.rawText, // Store text if available, else fallback to rawTtext with header
                 chunk_id: chunkId,
                 chunk_type: chunk.type,
                 section_header: chunk.sectionHeader.toLowerCase().trim() || 'Unknown Section',
@@ -437,14 +436,10 @@ async function processDocument(pdfFilePath) {
         }
 
         for (let i = 0; i < embeddings.length; i++) {
-            const pointPayload = {
-                ...chunkMetadataList[i], // Include all existing metadata
-                text: textsToEmbed[i]    // Add the actual chunk text
-            };
             pointsToUpsert.push({
-                id: chunkMetadataList[i].chunk_id, // Use generated UUID for point ID
+                id: chunkMetadataList[i].chunk_id,
                 vector: embeddings[i],
-                payload: pointPayload, // Store all metadata in payload
+                payload: chunkMetadataList[i], // This payload contains the raw text
             });
         }
 
