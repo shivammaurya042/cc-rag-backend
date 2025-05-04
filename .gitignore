@@ -9,8 +9,7 @@ yarn.lock
 .env.*.local
 
 # Data files
-/data/
-*.pdf
+/complete file/
 
 # Logs
 logs

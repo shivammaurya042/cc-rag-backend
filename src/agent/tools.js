@@ -7,7 +7,7 @@ import { config } from "../config.js";
 // Initialize clients needed by the tool (outside the function for efficiency)
 const embeddings = new OpenAIEmbeddings({
     apiKey: config.openaiApiKey,
-    model: config.EMBEDDING_OPENAI_TEXT_3_SMALL,
+    model: config.embeddingModelName,
     dimensions: 1536,
 });
 
