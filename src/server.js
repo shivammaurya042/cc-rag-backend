@@ -5,12 +5,33 @@ import { getAgentExecutor } from './agent/agent.js';
 import { getChatHistory, saveChatHistory } from './agent/memory.js';
 import { AIMessage, BaseMessage, HumanMessage } from '@langchain/core/messages'; // Import specific message types
 import { getRedisClient } from './redisClient.js'; // Import redis client getter
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // Limit each IP to 20 requests per windowMs
+    message: 'Too many requests from this IP, please try again after 15 minutes',
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    keyGenerator: (req, res) => { // Use IP address as the key
+        return req.ip;
+    }
+});
+
+const corsOptions = {
+    // IMPORTANT: In production, replace '*' with your frontend's actual domain
+    origin: process.env.NODE_ENV === 'production' ? 'https://your-frontend-domain.com' : '*',
+    methods: ['GET', 'POST'], // Only allow necessary methods
+    allowedHeaders: ['Content-Type'], // Only allow necessary headers (add X-Session-ID if you send it as a header)
+  };
 
 const app = express();
 
 // Middleware
-app.use(cors()); // Allow requests from frontend (configure origin in production)
+app.use('/chat', limiter); // Apply specifically to the chat endpoint
+app.use(helmet());
+app.use(cors(corsOptions)); // Allow requests from frontend (configure origin in production)
 app.use(express.json()); // Parse JSON request bodies
 
 // Simple health check endpoint
@@ -19,7 +40,7 @@ app.get('/health', (req, res) => {
 });
 
 // Main chat endpoint
-app.post('/chat', async (req, res) => {
+app.post('/chat', async (req, res, next) => {
     const { message, sessionId } = req.body;
 
     // Basic validation
@@ -29,11 +50,18 @@ app.post('/chat', async (req, res) => {
     if (!sessionId || typeof sessionId !== 'string' || sessionId.trim().length === 0) {
         return res.status(400).json({ error: 'Session ID is required.' });
     }
+    // Basic Session ID check (example: assumes UUID format expected from frontend)
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    if (!sessionId || typeof sessionId !== 'string' || !uuidRegex.test(sessionId)) {
+         return res.status(400).json({ error: 'Invalid or missing session ID.' });
+    }
 
     console.log(`\n--- Received request for session: ${sessionId} ---`);
     console.log(`User message: ${message}`);
 
     try {
+        const cleanedMessage = message.trim();
+
         // Retrieve history (as LangChain message objects)
         const chatHistory = await getChatHistory(sessionId);
         console.log(`Retrieved ${chatHistory.length} messages from history.`);
@@ -44,7 +72,7 @@ app.post('/chat', async (req, res) => {
         // Prepare agent input (ensure correct types)
         // The specific keys needed ("input", "chat_history") match the prompt placeholders
         const agentInput = {
-            input: message,
+            input: cleanedMessage,
             chat_history: chatHistory,
         };
 
@@ -62,7 +90,7 @@ app.post('/chat', async (req, res) => {
         // Update history with the new turn
         const newHistory = [
             ...chatHistory,
-            new HumanMessage(message), // User's input message
+            new HumanMessage(cleanedMessage), // User's input message
             new AIMessage(agentOutput)  // Agent's final output message
         ];
 
@@ -75,7 +103,7 @@ app.post('/chat', async (req, res) => {
 
     } catch (error) {
         console.error(`Error processing chat request for session ${sessionId}:`, error);
-        res.status(500).json({ error: 'An internal server error occurred. Please try again later.' });
+        next(error); // Pass error to the error handling middleware
     }
     console.log(`--- Finished processing request for session: ${sessionId} ---`);
 });
@@ -83,6 +111,7 @@ app.post('/chat', async (req, res) => {
 // Start the server
 async function startServer() {
     try {
+        console.log("\n--- Starting Server ---", process.env.NODE_ENV);
         // Initialize agent executor on startup (optional, but warms it up)
         await getAgentExecutor();
         // Ensure Redis connection is established
@@ -98,5 +127,11 @@ async function startServer() {
          process.exit(1);
     }
 }
+
+// Error handling middleware - must be after all routes
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Oops! Something went wrong.' });
+});
 
 startServer();
