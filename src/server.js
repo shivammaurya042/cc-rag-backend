@@ -117,8 +117,9 @@ async function startServer() {
         // Ensure Redis connection is established
         await getRedisClient();
 
-        app.listen(config.port, () => {
-            console.log(`Server listening on port ${config.port}`);
+        const port = process.env.PORT || config.port;
+        app.listen(port, () => {
+            console.log(`Server listening on port ${port}`);
             console.log(`Qdrant URL: ${config.qdrantUrl}`);
             console.log(`Redis URL: ${config.redis.host}:${config.redis.port}`);
         });
