@@ -29,6 +29,7 @@
     "fs": "^0.0.1-security",
     "helmet": "^8.1.0",
     "langchain": "^0.3.23",
+    "langsmith": "^0.3.28",
     "llamaindex": "^0.9.0",
     "marked": "^15.0.8",
     "openai": "^4.95.0",

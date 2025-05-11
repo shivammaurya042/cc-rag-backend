@@ -21,10 +21,33 @@ export const config = {
     agentModelName: 'gemini-2.0-flash', // dont change
     qdrantCollectionName: 'cards_store', // Ensure this matches ingestion
     maxConversationTokens: 4000, // Approx token limit for history passed to LLM
+    llamaParse: {
+        apiKey: process.env.LLAMA_CLOUD_API_KEY, // Required for LlamaParse
+    },
+
+    // LangSmith Observability
+    langsmith: {
+        tracing: process.env.LANGSMITH_TRACING === 'true', // Ensure boolean conversion
+        apiKey: process.env.LANGSMITH_API_KEY,
+        project: process.env.LANGSMITH_PROJECT || 'credit-card-rag-default', // Default project name if not set
+        endpoint: process.env.LANGSMITH_ENDPOINT || 'https://api.smith.langchain.com',
+    },
 };
 
 // Basic validation
 if (!config.openaiApiKey || !config.googleApiKey || !config.qdrantUrl || !config.redis.host || !config.redis.password) {
     console.error("FATAL ERROR: Missing essential environment variables!");
     process.exit(1);
+}
+
+// Validate essential API keys
+if (!config.googleApiKey) {
+    console.warn("Warning: GOOGLE_API_KEY is not set. Google LLM features (agent, metadata extraction) will fail.");
+}
+
+// Validate LangSmith API Key if tracing is enabled
+if (config.langsmith.tracing && !config.langsmith.apiKey) {
+    console.warn(
+        "Warning: LANGSMITH_TRACING is true, but LANGSMITH_API_KEY is not set. Tracing will likely fail."
+    );
 }
