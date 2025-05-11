@@ -5,6 +5,7 @@ import { getAgentExecutor } from './agent/agent.js';
 import { getChatHistory, saveChatHistory } from './agent/memory.js';
 import { AIMessage, BaseMessage, HumanMessage } from '@langchain/core/messages'; // Import specific message types
 import { getRedisClient } from './redisClient.js'; // Import redis client getter
+import { traceable } from "langsmith/traceable";
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
@@ -109,7 +110,7 @@ app.post('/chat', async (req, res, next) => {
 });
 
 // Start the server
-async function startServer() {
+const rag = traceable(async function startServer() {
     try {
         console.log("\n--- Starting Server ---", process.env.NODE_ENV);
         // Initialize agent executor on startup (optional, but warms it up)
@@ -127,7 +128,7 @@ async function startServer() {
          console.error("Failed to start server:", error);
          process.exit(1);
     }
-}
+});
 
 // Error handling middleware - must be after all routes
 app.use((err, req, res, next) => {
@@ -135,4 +136,4 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Oops! Something went wrong.' });
 });
 
-startServer();
+rag();
