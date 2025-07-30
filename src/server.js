@@ -23,8 +23,7 @@ const limiter = rateLimit({
 const corsOptions = {
     // IMPORTANT: In production, replace '*' with your frontend's actual domain
     origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_DOMAIN_URL : '*',
-    methods: ['GET', 'POST'], // Only allow necessary methods
-    allowedHeaders: ['Content-Type'], // Only allow necessary headers (add X-Session-ID if you send it as a header)
+    methods: ['GET', 'POST', 'OPTIONS'], // Only allow necessary methods
   };
 
 const app = express();
