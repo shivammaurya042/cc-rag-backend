@@ -3,7 +3,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { marked } from 'marked';
 import { OpenAI } from 'openai';
-import { QdrantClient } from "@qdrant/js-client-rest";
+import { getQdrantClient, ensureCollection } from './src/qdrant.js';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,10 +38,7 @@ if (!LLAMA_CLOUD_API_KEY || !OPENAI_API_KEY || !GOOGLE_API_KEY || !QDRANT_URL ||
 
 // --- Initialize Clients ---
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const qdrantClient = new QdrantClient({
-    url: QDRANT_URL,
-    apiKey: QDRANT_API_KEY,
-});
+const qdrantClient = getQdrantClient();
 const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 const metadataModel = genAI.getGenerativeModel({ model: METADATA_EXTRACTION_MODEL_NAME });
 
@@ -296,8 +293,8 @@ JSON Output:`;
         //                ? extractedData.issuer.trim() : "Unknown Issuer";
         // const cardName = (extractedData?.card_name && typeof extractedData.card_name === 'string' && extractedData.card_name.trim())
         //                  ? extractedData.card_name.trim() : "Unknown Card";
-        const issuer = "SBI Bank";
-        const cardName = "SBI SimplyCLICK Card";
+        const issuer = "Axis Bank";
+        const cardName = "Axis Atlas Credit Card";
         const docVersion = (extractedData?.document_version && typeof extractedData.document_version === 'string')
                          ? extractedData.document_version.trim() : null;
 
@@ -504,19 +501,12 @@ async function main() {
     let successCount = 0;
     let failureCount = 0;
 
-    // Check Qdrant Collection
-    try {
-        await qdrantClient.getCollection(QDRANT_COLLECTION_NAME);
-        console.log(`[Qdrant] Collection '${QDRANT_COLLECTION_NAME}' confirmed.`);
-    } catch (e) {
-         if (e.message?.includes('Not found') || e.status === 404) {
-            console.error(`[Qdrant] Error: Collection '${QDRANT_COLLECTION_NAME}' does not exist.`);
-            // Optionally provide instructions to create it.
-            process.exit(1);
-         } else {
-            console.warn(`[Qdrant] Warning checking collection '${QDRANT_COLLECTION_NAME}': ${e.message}.`);
-         }
-    }
+    // Ensure Qdrant collection exists
+    await ensureCollection({
+        collectionName: QDRANT_COLLECTION_NAME,
+        vectorSize: 1536, // OpenAI text-embedding-3-small
+        distance: 'Cosine',
+    });
 
     // Process each file
     for (const filePath of filesToProcess) {

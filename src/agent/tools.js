@@ -1,6 +1,6 @@
 import { DynamicTool } from "@langchain/core/tools";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { QdrantClient } from "@qdrant/js-client-rest";
+import { getQdrantClient } from "../qdrant.js";
 import { loadValidCards } from "../utils/loadValidCards.js";
 import { config } from "../config.js";
 
@@ -11,10 +11,7 @@ const embeddings = new OpenAIEmbeddings({
     dimensions: 1536,
 });
 
-const qdrantClient = new QdrantClient({
-    url: config.qdrantUrl,
-    apiKey: config.qdrantApiKey,
-});
+const qdrantClient = getQdrantClient();
 
 export async function createSearchTool() {
     const validCards = await loadValidCards(); // Load valid cards once
