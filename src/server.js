@@ -21,16 +21,35 @@ const limiter = rateLimit({
 });
 
 const corsOptions = {
-    // IMPORTANT: In production, replace '*' with your frontend's actual domain
-    origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_DOMAIN_URL : '*',
-    methods: ['GET', 'POST', 'OPTIONS'], // Only allow necessary methods
-  };
+    origin: (origin, callback) => {
+        // In production, the origin is the frontend URL. In dev, we can allow requests with no origin (e.g., from Postman).
+        const allowedOrigins = process.env.NODE_ENV === 'production'
+            ? [process.env.FRONTEND_DOMAIN_URL]
+            : ['*', undefined]; // Allow everything in dev
+
+        console.log(`Request origin: ${origin}`); // Log the incoming origin for debugging
+
+        if (process.env.NODE_ENV !== 'production' || (origin && allowedOrigins.includes(origin))) {
+            callback(null, true); // Origin is allowed
+        } else {
+            console.error(`CORS Error: Origin ${origin} not allowed.`);
+            callback(new Error('Not allowed by CORS')); // Origin is not allowed
+        }
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+    credentials: true, // Allow cookies to be sent
+};
 
 const app = express();
 
 // Middleware
 app.use('/chat', limiter); // Apply specifically to the chat endpoint
 app.use(helmet());
+
+// Pre-flight request handling
+app.options('*', cors(corsOptions)); // Enable pre-flight across-the-board
+
 app.use(cors(corsOptions)); // Allow requests from frontend (configure origin in production)
 app.use(express.json()); // Parse JSON request bodies
 
