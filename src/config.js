@@ -9,7 +9,7 @@ export const config = {
     qdrantApiKey: process.env.QDRANT_API_KEY,
     redis: {
         host: process.env.REDIS_HOST,
-        port: parseInt(process.env.REDIS_PORT || '15989', 10),
+        port: parseInt(process.env.REDIS_PORT, 10),
         username: process.env.REDIS_USERNAME || 'default',
         password: process.env.REDIS_PASSWORD
     },
@@ -29,7 +29,7 @@ export const config = {
     langsmith: {
         tracing: process.env.LANGSMITH_TRACING === 'true', // Ensure boolean conversion
         apiKey: process.env.LANGSMITH_API_KEY,
-        project: process.env.LANGSMITH_PROJECT || 'credit-card-rag-default', // Default project name if not set
+        project: process.env.LANGSMITH_PROJECT, // Default project name if not set
         endpoint: process.env.LANGSMITH_ENDPOINT || 'https://api.smith.langchain.com',
     },
 };
