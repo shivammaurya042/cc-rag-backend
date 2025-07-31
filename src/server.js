@@ -23,14 +23,11 @@ const limiter = rateLimit({
 const corsOptions = {
     origin: function (origin, callback) {
         const allowedOrigin = process.env.FRONTEND_DOMAIN_URL;
-        console.log(`[CORS] Request Origin: ${origin}`);
-        console.log(`[CORS] Allowed Origin (from env): ${allowedOrigin}`);
-
+        // In production, only allow requests from the frontend domain.
+        // In development, or for same-origin/server-to-server requests, allow.
         if (process.env.NODE_ENV !== 'production' || !origin || origin === allowedOrigin) {
-            console.log('[CORS] Origin allowed.');
             callback(null, true);
         } else {
-            console.error('[CORS] Origin not allowed.');
             callback(new Error('Not allowed by CORS'));
         }
     },
