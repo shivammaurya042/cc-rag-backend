@@ -294,7 +294,7 @@ JSON Output:`;
         // const cardName = (extractedData?.card_name && typeof extractedData.card_name === 'string' && extractedData.card_name.trim())
         //                  ? extractedData.card_name.trim() : "Unknown Card";
         const issuer = "Axis Bank";
-        const cardName = "Axis Atlas Credit Card";
+        const cardName = "Axis Magnus Credit Card";
         const docVersion = (extractedData?.document_version && typeof extractedData.document_version === 'string')
                          ? extractedData.document_version.trim() : null;
 
@@ -331,7 +331,7 @@ async function getEmbeddings(texts) {
 
 // Qdrant Upsert Function (Keep as is)
 async function upsertToQdrant(points) {
-    if (!points || points.length === 0) {
+    if (!points || points.length === 0) { 
         console.log('[Qdrant] No points to upsert.'); return;
     }
     console.log(`[Qdrant] Upserting ${points.length} points to collection '${QDRANT_COLLECTION_NAME}'...`);
@@ -502,11 +502,7 @@ async function main() {
     let failureCount = 0;
 
     // Ensure Qdrant collection exists
-    await ensureCollection({
-        collectionName: QDRANT_COLLECTION_NAME,
-        vectorSize: 1536, // OpenAI text-embedding-3-small
-        distance: 'Cosine',
-    });
+    await ensureCollection();
 
     // Process each file
     for (const filePath of filesToProcess) {

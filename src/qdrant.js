@@ -24,8 +24,12 @@ export const getQdrantClient = () => {
  * @param {number} options.vectorSize - The size of the vectors.
  * @param {string} options.distance - The distance metric to use.
  */
-export const ensureCollection = async ({ collectionName, vectorSize, distance }) => {
+export const ensureCollection = async () => {
+    const collectionName = config.qdrantCollectionName;
+    const vectorSize = 1536; // OpenAI text-embedding-3-small
+    const distance = 'Cosine';
     const client = getQdrantClient();
+
     try {
         await client.getCollection(collectionName);
         console.log(`[Qdrant] Collection '${collectionName}' already exists.`);
@@ -36,7 +40,12 @@ export const ensureCollection = async ({ collectionName, vectorSize, distance })
                 vectors: {
                     size: vectorSize,
                     distance: distance,
-                },
+                }
+            });
+            // 2. Index the 'card_name' payload for fast Match filters
+            await client.createPayloadIndex(collectionName, {
+                field_name: "card_name",
+                field_schema: "keyword",
             });
             console.log(`[Qdrant] Collection '${collectionName}' created successfully.`);
         } else {
